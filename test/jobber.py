@@ -9,11 +9,9 @@
 # recursively and all files are processed regardless of "depth"
 #
 
-
 import pdb, sys, getopt, time, logging, os, re
-import watchdog.events
-
 from q import Q
+import watchdog.events
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
@@ -27,10 +25,9 @@ def main(argv):
     try:
         opts, args = getopt.getopt(argv, "wp:s:")
     except getopt.GetoptError:
-        print 'Usage: jobber.py -s /your/script.sh [-t /your/template.qsub] [-wp] [/path/to/data/directory]'
+        print 'Usage: jobber.py -s /your/script.sh [-wp] [/path/to/data/directory]'
         sys.exit(0)
         
-    q.template = os.path.abspath("templates/job.qsub")
     for opt, arg in opts:
         if opt == '-w':
             watch = True
@@ -38,8 +35,6 @@ def main(argv):
             q.pattern = arg
         if opt == '-s':
             q.script = arg
-        if opt == '-t':
-            q.template =  os.path.abspath(arg)
             
     if not q.script:
         print 'No script specified (-s options is required).  Exiting...'
