@@ -35,7 +35,8 @@ class Q(FileSystemEventHandler):
         * pattern: file pattern to filter discovered files with
         * template: path to qsub job file template.
         
-        """         self.items = {}
+        """         
+        self.items = {}
         self.running = 0
         self.throttle = {'settle': 2, 'pause': 10, 'maxjobs': 10}
         self.timer = None
