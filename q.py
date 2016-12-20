@@ -1,6 +1,6 @@
 """
 .. module:: Q
-   :platform: Unix, Windows
+   :platform: Unix
    :synopsis: Throttle qsub job submission to play nicely with others while
               automating large number of jobs.
 
