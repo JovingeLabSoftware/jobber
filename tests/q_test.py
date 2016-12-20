@@ -57,7 +57,7 @@ class QTest(unittest.TestCase):
         time.sleep(1)
 
         self.assertEqual(self.q.running, 10)
-        time.sleep(2)
+        time.sleep(3)
 
         self.assertEqual(self.q.running, 0)
         self.assertEqual(self.q.status(), 3)
