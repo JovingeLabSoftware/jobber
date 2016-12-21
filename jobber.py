@@ -64,7 +64,6 @@ def main(argv):
     q.process()
 
     if watch:
-        print "Processing current files and watching directory " + path + "for new files..."
         observer = Observer()
         observer.schedule(q, path, recursive=True)
         observer.start()
@@ -76,7 +75,6 @@ def main(argv):
         observer.join()
 
     else:
-        print "Processing current files..."
         while q.status() > 0:
             time.sleep(1)
 
