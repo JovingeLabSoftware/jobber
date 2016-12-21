@@ -16,7 +16,7 @@ from threading import Timer
 from watchdog.events import FileSystemEventHandler
 
 # does our version of qsub support -sync t ?
-SYNC=True
+SYNC=False
 
 class Q(FileSystemEventHandler):
     def __init__(self):

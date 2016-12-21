@@ -56,7 +56,7 @@ def main(argv):
     for f in filelist:
         q.enqueue(f)
 
-    q.start()
+    q.process()
 
     if watch:
         print "Processing current files and watching directory " + path + "for new files..."
