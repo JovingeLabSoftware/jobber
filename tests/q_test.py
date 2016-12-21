@@ -85,7 +85,7 @@ class QTest(unittest.TestCase):
 
     @mock.patch("q.Q.runCmd", side_effect=mock_run)
     def test_check_qstat(self, mock_run):
-        self.assertEqual(self.q.qsub_start([]), "9999989")
+        self.assertEqual(self.q.qsub_start([]), "999999")
         self.assertTrue(self.q.check_qstat("99493"))
         self.assertTrue(mock_run.called, "Subprocess not called")
     
