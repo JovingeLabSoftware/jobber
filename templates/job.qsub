@@ -5,6 +5,8 @@
 #PBS -d $dir
 #PBS -N jobber_batch
 #PBS -q longq
+#PBS -e /dev/null
+#PBS -o /dev/null
 
 $script $file
 
