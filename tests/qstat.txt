@@ -1,0 +1,13 @@
+Job ID                    Name             User            Time Use S Queue
+------------------------- ---------------- --------------- -------- - -----
+99493.master               Redis            ace.jones       00:24:45 R longq
+111797.master              brd2-c3          adelaide.rich   5270:48: R longq
+111992.master              mutect2          sven.landon     215:14:2 R bbc
+112022.master              STDIN            juju.bees       01:13:23 R longq
+112055.master              WT-GCGR          ace.ventura     381:12:3 R gpu
+112056.master              TI-GCGR          ace.ventura     381:32:3 R gpu
+112062.master              ...23_2dc2_dc6_3 ace.ventura     12:40:44 R longq
+112063.master              STDIN            juju.bees       00:09:26 R longq
+112065.master              dc612_2dc3_Orc   george.smith    02:22:39 R longq
+112067.master              STDIN            juju.bees       00:09:53 R longq
+112068.master              STDIN            sven.landon     00:05:35 R bbc
