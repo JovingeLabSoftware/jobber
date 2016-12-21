@@ -15,6 +15,8 @@ from string import Template
 from threading import Timer
 from watchdog.events import FileSystemEventHandler
 
+# does our version of qsub support -sync t ?
+SYNC=True
 
 class Q(FileSystemEventHandler):
     def __init__(self):
@@ -94,9 +96,14 @@ class Q(FileSystemEventHandler):
         """
         if(path in self.items.keys()):
             i = self.items[path]
-            if i["job"]:
-                if i["job"].poll():
-                    i["job"].terminate()
+            if SYNC:
+                if i["job"]:
+                    if i["job"].poll():
+                        i["job"].terminate()
+            else:
+                if i["job"]:
+                    if self.check_qstat(i["job"]):
+                        self.qsub_del(i["job"])
             del self.items[path]
         return 0
     
@@ -169,7 +176,10 @@ class Q(FileSystemEventHandler):
                 f.write(qsub)
 
                 i["qsub"] = f
-                i["job"] = subprocess.Popen(["qsub -sync y", f.name, k])
+                if SYNC:
+                    i["job"] = subprocess.Popen(["echo", "-sync", "y", f.name, k])
+                else:
+                    i["job"] = self.qsub_start([f.name, k])
                 i["running"] = True
                 self.running = self.running + 1
 
@@ -179,9 +189,6 @@ class Q(FileSystemEventHandler):
     def status(self):
         return(self.size())
         
-    def start(self):
-        self.process()
-        return 0
 
     #
     # if wait, will complete queued jobs before
@@ -202,12 +209,16 @@ class Q(FileSystemEventHandler):
         else:
             if(self.timer):
                 self.timer.cancel()
-            for k in self.items:
+            for k in list(self.items):
                 if self.items[k]["job"]:
                     i = self.items[k]
-                    i["job"].terminate()
+                    if SYNC:
+                        i["job"].terminate()
+                    else:
+                        self.qsub_del(i["job"])
                     i["running"] = False
                     self.running = self.running - 1
+                self.dequeue(k)
         return 0
         
 
@@ -223,10 +234,15 @@ class Q(FileSystemEventHandler):
         for k in self.items:
             i = self.items[k]
             if i["job"]:
-                if i["job"].poll() is 0:
-                    dq.append(k)
-                    i["qsub"].close()
-                    self.running = self.running - 1
+                if SYNC:
+                    if i["job"].poll() is 0:
+                        dq.append(k)
+                        self.running = self.running - 1
+                else:
+                    if not self.check_qstat(i["job"]):
+                        dq.append(k)
+                        self.running = self.running - 1
+                i["qsub"].close()
         for k in dq:
             self.dequeue(k)
         if self.running == 0 and self.size() > 0:
@@ -234,3 +250,57 @@ class Q(FileSystemEventHandler):
         elif self.running > 0:
             self.reset(t="settle", next="update")
         
+    def runCmd(self, command):
+        """
+        Run a command and capture the output 
+        
+        Got this from SO question 4760215: https://goo.gl/Ii2pdw. Kudos to 
+        JF Sebastian and Max Ekman
+        
+        :returns: Iterator providing the command output
+        """
+        p = subprocess.Popen(command,
+             stdout=subprocess.PIPE,
+             stderr=subprocess.STDOUT)
+        return iter(p.stdout.readlines(), b'')
+
+    def check_qstat(self, job):
+        """
+        If -sync t option not available for our version of qsub, we 
+        need to monitor our jobs the hard way by capturing qstat output
+        
+        Based on Hooting's answer to SO question 32598754: 
+        https://goo.gl/UwsVRE
+
+        :returns: True if job still running (bool)
+        """ 
+        jobs = self.runCmd(["qstat"])
+        for line in jobs:
+            columns = line.split()
+            id = re.sub("\..*", "", columns[0])
+            if id == job:
+                return True
+        return False            
+        
+    def qsub_start(self, args):
+        """
+        If -sync t option not available for our version of qsub, we 
+        need to capture the job id so we can monitor its progress and 
+        also terminate it if needed.
+        
+        :returns: id of job
+        """ 
+        job = self.runCmd(["qsub"] + args)
+        id = job[0].split()
+        id = re.sub("\..*", "", id[0])
+        return id
+
+    def qsub_del(self, id):
+        """
+        If -sync t option not available for our version of qsub, we 
+        need to manually delete the jobs from the qsub queue 
+
+        :returns: 0.  Called for side effect of terminating jobs
+        """ 
+        runCmd(["qdel", id])
+        return 0
