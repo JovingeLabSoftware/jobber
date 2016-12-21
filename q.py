@@ -172,8 +172,10 @@ class Q(FileSystemEventHandler):
                      'file': k}
                 qsub = src.substitute(d)
 
-                f = tempfile.NamedTemporaryFile(mode='w', suffix='.qsub', dir='temp')
+                f = tempfile.NamedTemporaryFile(mode='w', suffix='.qsub', dir='temp', delete=True)
                 f.write(qsub)
+                f.flush()
+
 
                 i["qsub"] = f
                 if SYNC:
@@ -259,7 +261,6 @@ class Q(FileSystemEventHandler):
         
         :returns: Iterator providing the command output
         """
-        print(command)
         p = subprocess.Popen(command,
              stdout=subprocess.PIPE,
              stderr=subprocess.STDOUT)
@@ -294,9 +295,7 @@ class Q(FileSystemEventHandler):
         """ 
         job = self.runCmd(["qsub"] + args)
         id = next(x for x in job)
-        print(id)
         id = id.split()[0]
-        print(id)
         id = re.sub("\..*", "", id[0])
         return id
 
