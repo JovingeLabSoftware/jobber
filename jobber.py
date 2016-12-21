@@ -31,7 +31,7 @@ def main(argv):
         sys.exit(0)
         
     q.template = os.path.abspath("templates/job.qsub")
-    throttle = {'settle': 2, 'pause': 1, 'maxjobs': 5)
+    throttle = {'settle': 2, 'pause': 1, 'maxjobs': 5}
     for opt, arg in opts:
         if opt == '-w':
             watch = True
@@ -40,7 +40,7 @@ def main(argv):
         if opt == '-s':
             q.script = arg
         if opt == '-j':
-            throttl['maxjobs'] = arg
+            throttle['maxjobs'] = arg
         if opt == '-t':
             q.template =  os.path.abspath(arg)
             

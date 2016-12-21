@@ -168,7 +168,7 @@ class Q(FileSystemEventHandler):
 
                 src = Template(open(self.template).read())
                 d = {'script': i["exec"],
-                     'dir': os.path.dirname(k),
+                     'dir': os.getcwd(),
                      'file': k}
                 qsub = src.substitute(d)
 
