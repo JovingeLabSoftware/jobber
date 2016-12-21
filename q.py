@@ -177,9 +177,9 @@ class Q(FileSystemEventHandler):
 
                 i["qsub"] = f
                 if SYNC:
-                    i["job"] = subprocess.Popen(["echo", "-sync", "y", f.name, k])
+                    i["job"] = subprocess.Popen(["echo", "-sync", "y", f.name])
                 else:
-                    i["job"] = self.qsub_start([f.name, k])
+                    i["job"] = self.qsub_start([f.name])
                 i["running"] = True
                 self.running = self.running + 1
 
@@ -259,10 +259,12 @@ class Q(FileSystemEventHandler):
         
         :returns: Iterator providing the command output
         """
+        print(command)
         p = subprocess.Popen(command,
              stdout=subprocess.PIPE,
              stderr=subprocess.STDOUT)
-        return iter(p.stdout.readlines(), b'')
+        content = iter(p.stdout.readline, '')
+        return content
 
     def check_qstat(self, job):
         """
@@ -291,7 +293,10 @@ class Q(FileSystemEventHandler):
         :returns: id of job
         """ 
         job = self.runCmd(["qsub"] + args)
-        id = job[0].split()
+        id = next(x for x in job)
+        print(id)
+        id = id.split()[0]
+        print(id)
         id = re.sub("\..*", "", id[0])
         return id
 

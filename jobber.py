@@ -27,10 +27,11 @@ def main(argv):
     try:
         opts, args = getopt.getopt(argv, "wp:s:")
     except getopt.GetoptError:
-        print 'Usage: jobber.py -s /your/script.sh [-t /your/template.qsub] [-wp] [/path/to/data/directory]'
+        print 'Usage: jobber.py -s /your/script.sh [-t /your/template.qsub] [-wp] [-j maxjobs]  [/path/to/data/directory]'
         sys.exit(0)
         
     q.template = os.path.abspath("templates/job.qsub")
+    throttle = {'settle': 2, 'pause': 1, 'maxjobs': 5)
     for opt, arg in opts:
         if opt == '-w':
             watch = True
@@ -38,12 +39,16 @@ def main(argv):
             q.pattern = arg
         if opt == '-s':
             q.script = arg
+        if opt == '-j':
+            throttl['maxjobs'] = arg
         if opt == '-t':
             q.template =  os.path.abspath(arg)
             
     if not q.script:
         print 'No script specified (-s options is required).  Exiting...'
         sys.exit(0)
+
+    q.throttle = throttle
 
     path = args[0] if len(args) > 0 else '.'
 
