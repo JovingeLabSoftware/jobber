@@ -31,7 +31,7 @@ def main(argv):
             q.port = arg
         if opt == '-k':
             q.keep_files = True
-        if opt == '-k':
+        if opt == '-v':
             q.verbose = True
         if opt == '-p':
             q.pattern = arg
