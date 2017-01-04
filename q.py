@@ -10,15 +10,14 @@
 """
 
 import pdb, sys, time, os, sched, time, subprocess, warnings, re, tempfile
-import watchdog.events
+import socket
 from string import Template
 from threading import Timer
-from watchdog.events import FileSystemEventHandler
 
-# does our version of qsub support -sync t ?
-SYNC=False
+TEMP_ROOT = os.path.abspath(os.path.realpath( "./temp" ))
+TEMPLATE_ROOT = os.path.abspath(os.path.realpath( "./templates" ))
 
-class Q(FileSystemEventHandler):
+class Q():
     def __init__(self):
         """
         The Q Class
@@ -38,34 +37,28 @@ class Q(FileSystemEventHandler):
         * template: path to qsub job file template.
         
         """         
-        self.items = {}
-        self.running = 0
-        self.throttle = {'settle': 2, 'pause': 10, 'maxjobs': 10}
-        self.timer = None
         self.script = None
         self.pattern = ""
-        self.template = None
-        super(Q, self).__init__()
+        self.template = "templates/array.qsub"
+        self.items = {}
+        self.maxjobs = 50
+        # counters
+        self.spooled = 0
 
+        # job related files
+        self.qsub_file = None
+        self.wrapper_file = None
+        self.array_id = None
 
-    def reset(self, t="settle", next="update"):
-        """
-        Restart the throttling timer
-        
-        :param t: What kind of throtte: "settle" or "pause"
-        :type t: str ["settle", "pause"]
-        :param next: What to do when timer fires: "update" or "process"
-        :type next: str ["update", "process"]
-        :returns: 0.  Called for side effect of resetting timer
-        """ 
-        if(self.timer):
-            self.timer.cancel()
-        if next == "update":
-            self.timer = Timer(self.throttle[t], self.update)
-        elif next == "process":
-            self.timer = Timer(self.throttle[t], self.process)
-        self.timer.start()
-        return 0
+        # TCP/IP spool
+        self.connections = []
+        self.recv_buffer_size = 4096
+        self.port = 8002
+        self.server_socket = None
+
+    #
+    # Queue operations
+    #
 
     def enqueue(self, path):
         """
@@ -77,9 +70,7 @@ class Q(FileSystemEventHandler):
         """
         if re.search(self.pattern, path):
             if(path not in self.items.keys()):
-                self.items[path] = {"job": None, "exec": os.path.abspath(self.script), "running": False}
-                # specificying exec for every job is redundant since it is the 
-                # same for all jobs, but that could change in the future.
+                self.items[path] = {"job": None, "status": "waiting"}
         return 0
 
     def dequeue(self, path):
@@ -87,8 +78,10 @@ class Q(FileSystemEventHandler):
         Remove a file to process queue.  
         
         
-        Checks to see if there is an actively running process for this item and 
-        if so attempts to terminate the process before removing item from queue.
+        If the job is already dispatched to the spooler, it is too late.  In 
+        this case, dequeue will fail silently.
+        
+        TODO: Error handling for above case.
 
         :param path: Complete path of file to remove from queue
         :type path: str
@@ -96,159 +89,66 @@ class Q(FileSystemEventHandler):
         """
         if(path in self.items.keys()):
             i = self.items[path]
-            if SYNC:
-                if i["job"]:
-                    if i["job"].poll():
-                        i["job"].terminate()
-            else:
-                if i["job"]:
-                    if self.check_qstat(i["job"]):
-                        self.qsub_del(i["job"])
-            del self.items[path]
+            if not i["job"]:
+                del self.items[path]
         return 0
-    
-    def size(self):
-        """
-        Determine how large queue currently is
         
-        :returns: size of queue (int).  If 0, queue has completed its work
-        """
-        return len(self.items)
-
-    def on_created(self, event):
-        """
-        FileSystemEventHandler hook for file creation
-        :param event: Event object describind file creation event
-        :type event: object
-        :returns: 0.  Called for side effect of adding work to the queue
-        :Example:
-        
-        from q import Q
-        from watchdog.observers import Observer
-        q = Q()
-        observer = Observer()
-        observer.schedule(q, path, recursive=True)
-        observer.start()
-        """
-        path = os.path.abspath(event.src_path)
-        if not self.script:
-            warnings.warn("No script specified so skipping newly added files")
-        elif re.match(self.pattern, event.src_path):
-            self.enqueue(path, self.script)
-            self.reset("settle")
-        return 0
-
-    def on_deleted(self, event):
-        """
-        FileSystemEventHandler hook for file deletion
-        :param event: Event object describing file deletion event
-        :type event: object
-
-        Results in  a call to dequeue and therefore will attempt to gracefully
-        terminate active job, if any, prior to removing item from queue.
-        :returns: 0.  Called for side effect of removing work from the queue
-        """
-        self.dequeue(event.src_path)
-        return 0
 
     def process(self):
         """
         Process jobs on the queue
         
         If we are within the bounds of the queue's :code:`throttle` limits,
-        start jobs that are on queued.
+        start jobs that are enqueued.
         :returns: 0.  Called for side effect of starting jobs
         """
-        for k in self.items:
-            if not self.items[k]["running"]:
-                if self.running >= self.throttle["maxjobs"]:
-                    break
+        d = {'port': self.port}
+        self.wrapper_file = self.temp_file("jobber.sh", d, ".sh")
 
-                i = self.items[k]
+        d = {'array_size': len(self.items),
+             'wrapper': self.wrapper_file.name,
+             'script': self.script,
+             'chunk_size': min(len(self.items), self.maxjobs)}
 
-                src = Template(open(self.template).read())
-                d = {'script': i["exec"],
-                     'dir': os.path.dirname(k),
-                     'file': k}
-                qsub = src.substitute(d)
-
-                f = tempfile.NamedTemporaryFile(mode='w', suffix='.qsub', dir='temp')
-                f.write(qsub)
-
-                i["qsub"] = f
-                if SYNC:
-                    i["job"] = subprocess.Popen(["echo", "-sync", "y", f.name, k])
-                else:
-                    i["job"] = self.qsub_start([f.name, k])
-                i["running"] = True
-                self.running = self.running + 1
-
-        self.reset()
+        self.qsub_file = self.temp_file("array.qsub", d, ".qsub")
+        self.array_id = self.qsub_start([self.qsub_file.name])
         return 0
-    
-    def status(self):
-        return(self.size())
-        
 
-    #
-    # if wait, will complete queued jobs before
-    # exiting.  Otherwise will terminate immediately
-    #
-    def stop(self, wait=False):
+    def running(self):
+        """
+        Check queue status
+        
+        Determine whether there are actively running jobs
+        
+        :returns: bool.  
+        """
+        if self.array_id:
+            status = self.check_qstat(self.array_id))
+            if not status:
+                self.array_id = None
+                return False
+            else:
+                return True
+        else:
+            return False
+
+
+    def stop(self):
         """
         Stop the queue 
 
-        Stop the queue, optionally after all jobs complete.  Otherwise, 
-        running jobs will be terminated.
-        :param wait: whether to wait for jobs to complete.
-        :type wait: bool
-        :returns: 0.  Called for side effect of stopping the queue
+        Cancel the array job if running.
+        :returns: 0.  Called for side effect of cancelling the job
         """
-        if wait and self.size > 0:
-            Timer(self.throttle["settle"], self.stop, [True])
-        else:
-            if(self.timer):
-                self.timer.cancel()
-            for k in list(self.items):
-                if self.items[k]["job"]:
-                    i = self.items[k]
-                    if SYNC:
-                        i["job"].terminate()
-                    else:
-                        self.qsub_del(i["job"])
-                    i["running"] = False
-                    self.running = self.running - 1
-                self.dequeue(k)
+        if self.array_id:
+            self.qdel(self.array_id)
+            self.array_id = None
         return 0
         
 
-    def update(self):
-        """
-        Update the queue 
-
-        Purges completed jobs, and resets timers depending on whether there 
-        are more active jobs (settle) or not (pause).
-        :returns: 0.  Called for side effect of updating the queue
-        """
-        dq = []
-        for k in self.items:
-            i = self.items[k]
-            if i["job"]:
-                if SYNC:
-                    if i["job"].poll() is 0:
-                        dq.append(k)
-                        self.running = self.running - 1
-                else:
-                    if not self.check_qstat(i["job"]):
-                        dq.append(k)
-                        self.running = self.running - 1
-                i["qsub"].close()
-        for k in dq:
-            self.dequeue(k)
-        if self.running == 0 and self.size() > 0:
-            self.reset(t="pause", next="process")
-        elif self.running > 0:
-            self.reset(t="settle", next="update")
+ #
+ # Interface to qsub ecosystem
+ #
         
     def runCmd(self, command):
         """
@@ -284,9 +184,8 @@ class Q(FileSystemEventHandler):
         
     def qsub_start(self, args):
         """
-        If -sync t option not available for our version of qsub, we 
-        need to capture the job id so we can monitor its progress and 
-        also terminate it if needed.
+        Start job arrayn and capture the job id so we can monitor its progress 
+        and also terminate it if needed.
         
         :returns: id of job
         """ 
@@ -304,3 +203,79 @@ class Q(FileSystemEventHandler):
         """ 
         runCmd(["qdel", id])
         return 0
+
+
+
+#
+# Convenience functions
+#
+
+    def size(self):
+        """
+        Determine how large queue currently is
+        
+        :returns: size of queue (int).  If 0, queue has completed its work
+        """
+        return len(self.items)
+
+
+    def temp_file(self, template, d, suffix):
+        src = Template(open(TEMPLATE_ROOT + "/" + template).read())
+        t = src.substitute(d)
+        tf = tempfile.NamedTemporaryFile(mode='w', suffix=suffix, dir=TEMP_ROOT, delete=True)
+        tf.write(t)
+        return tf
+
+
+    
+
+#
+# TCP/IP server operations
+#
+    def start_server(self):
+        if self.server_socket:
+            self.server_socket.close()
+        self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self.server_socket.bind(("0.0.0.0", self.port))
+        self.server_socket.listen(100)
+        self.connections.append(self.server_socket)
+ 
+        print "Jobber Spool started on port " + str(self.port)
+
+    def stop_server(self):
+        if self.server_socket:
+            self.server_socket.close()
+
+    def get_job(self):
+        for k in self.items:
+            if self.items[k]["status"] == "waiting":
+                self.items[k]["status"] = "running"
+                return k
+        return None
+        
+        
+    def poll(self):
+        read_sockets, write_sockets, error_sockets = select.select(self.connections,[],[])
+ 
+        for sock in read_sockets:
+             
+            if sock == self.server_socket:
+                sockfd, addr = self.server_socket.accept()
+                self.connections.append(sockfd)
+                print("Connected to ", sockfd)
+
+            else:
+                try:
+                    data = sock.recv(self.recv_buffer_size)
+                    reg = re.compile("getjob", re.MULTILINE)
+                    if reg.findall(data):
+                        sock.send(self.get_job())
+                        sock.close()
+                        self.connections.remove(sock)
+                 
+                except:
+                    sock.close()
+                    self.connections.remove(sock)
+                    continue
+

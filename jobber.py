@@ -27,19 +27,21 @@ def main(argv):
     try:
         opts, args = getopt.getopt(argv, "wp:s:")
     except getopt.GetoptError:
-        print 'Usage: jobber.py -s /your/script.sh [-t /your/template.qsub] [-wp] [/path/to/data/directory]'
+        print 'Usage: jobber.py -s /your/script.sh [-m maxjobs] [-P port] [-p pattern] [/path/to/data/directory]'
         sys.exit(0)
         
     q.template = os.path.abspath("templates/job.qsub")
     for opt, arg in opts:
         if opt == '-w':
             watch = True
+        if opt == '-P':
+            q.port = arg
         if opt == '-p':
             q.pattern = arg
         if opt == '-s':
             q.script = arg
-        if opt == '-t':
-            q.template =  os.path.abspath(arg)
+        if opt == '-m':
+            q.maxjobs =  arg
             
     if not q.script:
         print 'No script specified (-s options is required).  Exiting...'
@@ -56,26 +58,13 @@ def main(argv):
     for f in filelist:
         q.enqueue(f)
 
+    q.start_server()
     q.process()
 
-    if watch:
-        print "Processing current files and watching directory " + path + "for new files..."
-        observer = Observer()
-        observer.schedule(q, path, recursive=True)
-        observer.start()
-        try:
-            while True:
-                time.sleep(1)
-        except KeyboardInterrupt:
-            observer.stop()
-        observer.join()
+    while q.running():
+        q.poll()
 
-    else:
-        print "Processing current files..."
-        while q.status() > 0:
-            time.sleep(1)
-
-    q.stop(False);
+    q.stop_server();
 
     return(0)
     

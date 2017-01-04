@@ -2,9 +2,9 @@
 
 #PBS -l walltime=01:00:00,procs=1,mem=1000mb
 #PBS -S /bin/bash
-#PBS -d $dir
 #PBS -N jobber_batch
 #PBS -q longq
+#PBS -t 1-$array_size%$chunk_size
 
-$script $file
+$wrapper $script 
 
