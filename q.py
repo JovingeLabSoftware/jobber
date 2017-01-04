@@ -44,7 +44,8 @@ class Q():
         self.maxjobs = 50
         self.keep_files = False
         self.array_id = None
-
+        self.verbose = False
+        
         # job related files
         self.qsub_file = None
         self.wrapper_file = None
@@ -122,6 +123,7 @@ class Q():
         :returns: bool.  
         """
         if self.array_id:
+            if verbose: print("Checking status of job id " + self.array_id)
             status = self.check_qstat(self.array_id)
             if not status:
                 self.array_id = None
@@ -251,6 +253,7 @@ class Q():
     def get_job(self):
         for k in self.items:
             if self.items[k]["status"] == "waiting":
+                if self.verbose: print("Job started: " + k)
                 self.items[k]["status"] = "running"
                 return k
         return None

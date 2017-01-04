@@ -23,7 +23,7 @@ def main(argv):
     try:
         opts, args = getopt.getopt(argv, "wp:s:")
     except getopt.GetoptError:
-        print 'Usage: jobber.py -s /your/script.sh [-m maxjobs] [-P port] [-p pattern] [-k] [/path/to/data/directory]'
+        print 'Usage: jobber.py -s /your/script.sh  [-kv] [-m maxjobs] [-P port] [-p pattern] [/path/to/data/directory]'
         sys.exit(0)
         
     for opt, arg in opts:
@@ -31,6 +31,8 @@ def main(argv):
             q.port = arg
         if opt == '-k':
             q.keep_files = True
+        if opt == '-k':
+            q.verbose = True
         if opt == '-p':
             q.pattern = arg
         if opt == '-s':
