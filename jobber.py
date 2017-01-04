@@ -24,6 +24,7 @@ def main(argv):
         opts, args = getopt.getopt(argv, "wp:s:")
     except getopt.GetoptError:
         print 'Usage: jobber.py -s /your/script.sh  [-kv] [-m maxjobs] [-P port] [-p pattern] [/path/to/data/directory]'
+        print getopt.GetoptError.print()
         sys.exit(0)
         
     for opt, arg in opts:
