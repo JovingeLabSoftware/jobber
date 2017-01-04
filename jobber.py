@@ -11,11 +11,7 @@
 
 
 import pdb, sys, getopt, time, logging, os, re
-import watchdog.events
-
 from q import Q
-from watchdog.observers import Observer
-from watchdog.events import FileSystemEventHandler
 
 def main(argv):
     watch = False
@@ -27,16 +23,14 @@ def main(argv):
     try:
         opts, args = getopt.getopt(argv, "wp:s:")
     except getopt.GetoptError:
-        print 'Usage: jobber.py -s /your/script.sh [-m maxjobs] [-P port] [-p pattern] [/path/to/data/directory]'
+        print 'Usage: jobber.py -s /your/script.sh [-m maxjobs] [-P port] [-p pattern] [-k] [/path/to/data/directory]'
         sys.exit(0)
         
-    q.template = os.path.abspath("templates/job.qsub")
-    throttle = {'settle': 2, 'pause': 1, 'maxjobs': 5}
     for opt, arg in opts:
-        if opt == '-w':
-            watch = True
         if opt == '-P':
             q.port = arg
+        if opt == '-k':
+            q.keep_files = True
         if opt == '-p':
             q.pattern = arg
         if opt == '-s':
@@ -47,8 +41,6 @@ def main(argv):
     if not q.script:
         print 'No script specified (-s options is required).  Exiting...'
         sys.exit(0)
-
-    q.throttle = throttle
 
     path = args[0] if len(args) > 0 else '.'
 

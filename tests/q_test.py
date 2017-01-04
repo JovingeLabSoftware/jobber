@@ -58,25 +58,6 @@ class QTest(unittest.TestCase):
         self.assertEqual(self.q.array_id, "112543[]")
         self.q.stop_server()
 
-    @nottest
-    def mock_run(*args, **kwargs):
-        c = args[0][0]
-        if c is "qstat":
-            # simulate return of qstat data
-            fn = os.getcwd()
-            fn = fn.replace("/tests", "") + "/tests/qstat.txt"
-            with open(fn) as f:
-                return(f.readlines())    
-        if c is "qsub":
-            # simulate qsub job starting
-            return(["999999.master.cm.cluster"])
-
-    @mock.patch("q.Q.runCmd", side_effect=mock_run)
-    def test_check_qstat(self, mock_run):
-        self.assertEqual(self.q.qsub_start([]), "999999")
-        self.assertTrue(self.q.check_qstat("99493"))
-        self.assertTrue(mock_run.called, "Subprocess not called")
-    
 
 if __name__ == '__main__':
     unittest.main()

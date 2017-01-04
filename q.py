@@ -42,13 +42,12 @@ class Q():
         self.template = "templates/array.qsub"
         self.items = {}
         self.maxjobs = 50
-        # counters
-        self.spooled = 0
+        self.keep_files = False
+        self.array_id = None
 
         # job related files
         self.qsub_file = None
         self.wrapper_file = None
-        self.array_id = None
 
         # TCP/IP spool
         self.connections = []
@@ -118,50 +117,12 @@ class Q():
         """
         Check queue status
         
-<<<<<<< HEAD
         Determine whether there are actively running jobs
-=======
-        If we are within the bounds of the queue's :code:`throttle` limits,
-        start jobs that are on queued.
-        :returns: 0.  Called for side effect of starting jobs
-        """
-        for k in self.items:
-            if not self.items[k]["running"]:
-                if self.running >= self.throttle["maxjobs"]:
-                    break
 
-                i = self.items[k]
-
-                src = Template(open(self.template).read())
-                d = {'script': i["exec"],
-                     'dir': os.getcwd(),
-                     'file': k}
-                qsub = src.substitute(d)
-
-                f = tempfile.NamedTemporaryFile(mode='w', suffix='.qsub', dir='temp', delete=True)
-                f.write(qsub)
-                f.flush()
-
-
-                i["qsub"] = f
-                if SYNC:
-                    i["job"] = subprocess.Popen(["echo", "-sync", "y", f.name])
-                else:
-                    i["job"] = self.qsub_start([f.name])
-                i["running"] = True
-                self.running = self.running + 1
-
-        self.reset()
-        return 0
-    
-    def status(self):
-        return(self.size())
->>>>>>> 9a3b6e333bc715c660f8722b0bdc1a6d42be7a7e
-        
         :returns: bool.  
         """
         if self.array_id:
-            status = self.check_qstat(self.array_id))
+            status = self.check_qstat(self.array_id)
             if not status:
                 self.array_id = None
                 return False
