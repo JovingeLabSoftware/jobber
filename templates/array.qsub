@@ -1,10 +1,11 @@
 #!/bin/bash
 
-#PBS -l walltime=00:10:00
+#PBS -l walltime=48:00:00
 #PBS -S /bin/bash
-#PBS -q shortq
-#PBS -t 1-$array_size%$chunk_size
+#PBS -e /dev/null
+#PBS -o /dev/null
 #PBS -l nodes=1:ppn=1
+#PBS -t 1-$array_size%$chunk_size
 
 $wrapper $script 
 
