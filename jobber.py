@@ -39,7 +39,7 @@ def main(argv):
         if opt == '-s':
             q.script = arg
         if opt == '-m':
-            q.maxjobs =  arg
+            q.maxjobs =  int(arg)
 
     if not q.script:
         print 'No script specified (-s options is required).  Exiting...'

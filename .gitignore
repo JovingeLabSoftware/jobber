@@ -1,6 +1,5 @@
 *.pyc
 *.*~
 temp
-test.log
 *.old
-
+*.log

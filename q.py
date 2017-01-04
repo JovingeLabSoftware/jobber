@@ -13,9 +13,15 @@ import pdb, sys, time, os, sched, time, subprocess, warnings, re, tempfile
 import socket, select
 from string import Template
 from threading import Timer
+import logging
 
-TEMP_ROOT = os.path.abspath(os.path.realpath( "./temp" ))
-TEMPLATE_ROOT = os.path.abspath(os.path.realpath( "./templates" ))
+
+
+dir = os.path.dirname(os.path.abspath(__file__))
+TEMP_ROOT = os.path.join(dir, "temp" )
+TEMPLATE_ROOT = os.path.join(dir, "./templates" )
+
+
 
 class Q():
     def __init__(self):
@@ -56,6 +62,9 @@ class Q():
         self.port = 8002
         self.server_socket = None
 
+        self.logger = self.initLogger()
+        
+
     #     
     # Queue operations
     #
@@ -69,6 +78,7 @@ class Q():
         :returns: 0.  Called for side effect of adding work to the queue
         """
         if re.search(self.pattern, path):
+            self.logger.info("queued " + path)
             if(path not in self.items.keys()):
                 self.items[path] = {"job": None, "status": "waiting"}
         return 0
@@ -112,7 +122,11 @@ class Q():
              'chunk_size': min(len(self.items), self.maxjobs)}
 
         self.qsub_file = self.temp_file("array.qsub", d, ".qsub", False)
-        self.array_id = self.qsub_start([self.qsub_file.name])
+        self.logger.info("starting job: " + self.qsub_file.name)
+        self.logger.info("total jobs queued: " + str(len(self.items)))
+        self.logger.info("max simultaneous jobs: " + str(self.maxjobs))
+        #self.array_id = self.qsub_start([self.qsub_file.name])
+
         return 0
 
     def running(self):
@@ -197,6 +211,7 @@ class Q():
         job = self.runCmd(["qsub"] + args)
         id = next(x for x in job)
         id = re.sub("\..*", "", id.rstrip())
+        self.logger.info("started job array with id " + id)
         return id
 
     def qsub_del(self, id):
@@ -239,6 +254,15 @@ class Q():
         os.chmod(path, mode)
 
 
+    def initLogger(self):
+        logger = logging.getLogger(__name__)
+        logger.setLevel(logging.INFO)
+        handler = logging.FileHandler('q.log')
+        handler.setLevel(logging.INFO)
+        formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        handler.setFormatter(formatter)
+        logger.addHandler(handler)
+        return(logger)
     
 
 #
@@ -253,16 +277,18 @@ class Q():
         self.server_socket.listen(100)
         self.connections.append(self.server_socket)
  
-        print "Jobber Spool started on port " + str(self.port)
+        self.logger.info("Jobber Spool started on port " + str(self.port))
 
     def stop_server(self):
         if self.server_socket:
             self.server_socket.close()
+        self.logger.info("spool shutdown as requested. ")
 
     def get_job(self):
         for k in self.items:
             if self.items[k]["status"] == "waiting":
                 if self.verbose: print("Job started: " + k)
+                self.logger.info("spool yielded file for processing: " + k)
                 self.items[k]["status"] = "running"
                 return k
         return None
@@ -287,6 +313,7 @@ class Q():
                         self.connections.remove(sock)
                  
                 except:
+                    self.logger.error("spool shut down UNEXPECTEDLY. " + k)
                     sock.close()
                     self.connections.remove(sock)
                     continue
