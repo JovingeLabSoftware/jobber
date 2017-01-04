@@ -1,6 +1,6 @@
 #!/bin/bash
 
-exec 3<>/dev/tcp/localhost/$port
+exec 3<>/dev/tcp/login01/$port
 echo -e "getjob" >&3
 FILE=$$(cat <&3)
 

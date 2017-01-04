@@ -21,10 +21,10 @@ def main(argv):
     q = Q()
 
     try:
-        opts, args = getopt.getopt(argv, "wp:s:")
-    except getopt.GetoptError:
+        opts, args = getopt.getopt(argv, "kvm:P:p:s:")
+    except getopt.GetoptError as err:
         print 'Usage: jobber.py -s /your/script.sh  [-kv] [-m maxjobs] [-P port] [-p pattern] [/path/to/data/directory]'
-        print getopt.GetoptError.print()
+        print(err)
         sys.exit(0)
         
     for opt, arg in opts:
@@ -44,6 +44,8 @@ def main(argv):
     if not q.script:
         print 'No script specified (-s options is required).  Exiting...'
         sys.exit(0)
+   
+    q.script = os.path.abspath(q.script)
 
     path = args[0] if len(args) > 0 else '.'
 
@@ -62,6 +64,7 @@ def main(argv):
     while q.running():
         q.poll()
 
+    print("Jobs complete.  Shutting down spool...")
     q.stop_server();
 
     return(0)

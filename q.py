@@ -10,7 +10,7 @@
 """
 
 import pdb, sys, time, os, sched, time, subprocess, warnings, re, tempfile
-import socket
+import socket, select
 from string import Template
 from threading import Timer
 
@@ -56,7 +56,7 @@ class Q():
         self.port = 8002
         self.server_socket = None
 
-    #
+    #     
     # Queue operations
     #
 
@@ -103,14 +103,15 @@ class Q():
         :returns: 0.  Called for side effect of starting jobs
         """
         d = {'port': self.port}
-        self.wrapper_file = self.temp_file("jobber.sh", d, ".sh")
+        self.wrapper_file = self.temp_file("jobber.sh", d, ".sh", True)
+
 
         d = {'array_size': len(self.items),
              'wrapper': self.wrapper_file.name,
              'script': self.script,
              'chunk_size': min(len(self.items), self.maxjobs)}
 
-        self.qsub_file = self.temp_file("array.qsub", d, ".qsub")
+        self.qsub_file = self.temp_file("array.qsub", d, ".qsub", False)
         self.array_id = self.qsub_start([self.qsub_file.name])
         return 0
 
@@ -123,7 +124,7 @@ class Q():
         :returns: bool.  
         """
         if self.array_id:
-            if verbose: print("Checking status of job id " + self.array_id)
+            if self.verbose: print("Checking status of job id " + self.array_id)
             status = self.check_qstat(self.array_id)
             if not status:
                 self.array_id = None
@@ -151,6 +152,7 @@ class Q():
  # Interface to qsub ecosystem
  #
         
+
     def runCmd(self, command):
         """
         Run a command and capture the output 
@@ -180,21 +182,21 @@ class Q():
         for line in jobs:
             columns = line.split()
             id = re.sub("\..*", "", columns[0])
-            if id == job:
+            if id == job and (columns[4] == "Q" or columns[4] == "R"):
                 return True
         return False            
         
     def qsub_start(self, args):
         """
-        Start job arrayn and capture the job id so we can monitor its progress 
+        Start job array and capture the job id so we can monitor its progress 
         and also terminate it if needed.
         
         :returns: id of job
         """ 
+
         job = self.runCmd(["qsub"] + args)
         id = next(x for x in job)
-        id = id.split()[0]
-        id = re.sub("\..*", "", id[0])
+        id = re.sub("\..*", "", id.rstrip())
         return id
 
     def qsub_del(self, id):
@@ -206,7 +208,6 @@ class Q():
         """ 
         runCmd(["qdel", id])
         return 0
-
 
 
 #
@@ -222,12 +223,20 @@ class Q():
         return len(self.items)
 
 
-    def temp_file(self, template, d, suffix):
+    def temp_file(self, template, d, suffix, executable=True):
         src = Template(open(TEMPLATE_ROOT + "/" + template).read())
         t = src.substitute(d)
-        tf = tempfile.NamedTemporaryFile(mode='w', suffix=suffix, dir=TEMP_ROOT, delete=True)
+        tf = tempfile.NamedTemporaryFile(mode='w', suffix=suffix, dir=TEMP_ROOT, delete=not self.keep_files)
         tf.write(t)
+        tf.flush()
+        if executable:
+            self.chmodx(tf.name)
         return tf
+
+    def chmodx(self, path):
+        mode = os.stat(path).st_mode
+        mode |= (mode & 0o444) >> 2  
+        os.chmod(path, mode)
 
 
     
@@ -260,14 +269,13 @@ class Q():
         
         
     def poll(self):
-        read_sockets, write_sockets, error_sockets = select.select(self.connections,[],[])
+        read_sockets, write_sockets, error_sockets = select.select(self.connections,[],[],1)
  
         for sock in read_sockets:
              
             if sock == self.server_socket:
                 sockfd, addr = self.server_socket.accept()
                 self.connections.append(sockfd)
-                print("Connected to ", sockfd)
 
             else:
                 try:

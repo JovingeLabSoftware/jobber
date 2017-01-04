@@ -1,3 +1,3 @@
 #!/bin/bash
 
-echo $1 >> log.txt
+echo $1 
