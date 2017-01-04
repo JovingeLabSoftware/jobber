@@ -125,7 +125,7 @@ class Q():
         self.logger.info("starting job: " + self.qsub_file.name)
         self.logger.info("total jobs queued: " + str(len(self.items)))
         self.logger.info("max simultaneous jobs: " + str(self.maxjobs))
-        #self.array_id = self.qsub_start([self.qsub_file.name])
+        self.array_id = self.qsub_start([self.qsub_file.name])
 
         return 0
 
