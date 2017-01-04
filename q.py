@@ -118,7 +118,45 @@ class Q():
         """
         Check queue status
         
+<<<<<<< HEAD
         Determine whether there are actively running jobs
+=======
+        If we are within the bounds of the queue's :code:`throttle` limits,
+        start jobs that are on queued.
+        :returns: 0.  Called for side effect of starting jobs
+        """
+        for k in self.items:
+            if not self.items[k]["running"]:
+                if self.running >= self.throttle["maxjobs"]:
+                    break
+
+                i = self.items[k]
+
+                src = Template(open(self.template).read())
+                d = {'script': i["exec"],
+                     'dir': os.getcwd(),
+                     'file': k}
+                qsub = src.substitute(d)
+
+                f = tempfile.NamedTemporaryFile(mode='w', suffix='.qsub', dir='temp', delete=True)
+                f.write(qsub)
+                f.flush()
+
+
+                i["qsub"] = f
+                if SYNC:
+                    i["job"] = subprocess.Popen(["echo", "-sync", "y", f.name])
+                else:
+                    i["job"] = self.qsub_start([f.name])
+                i["running"] = True
+                self.running = self.running + 1
+
+        self.reset()
+        return 0
+    
+    def status(self):
+        return(self.size())
+>>>>>>> 9a3b6e333bc715c660f8722b0bdc1a6d42be7a7e
         
         :returns: bool.  
         """
@@ -162,7 +200,8 @@ class Q():
         p = subprocess.Popen(command,
              stdout=subprocess.PIPE,
              stderr=subprocess.STDOUT)
-        return iter(p.stdout.readlines(), b'')
+        content = iter(p.stdout.readline, '')
+        return content
 
     def check_qstat(self, job):
         """
@@ -190,7 +229,8 @@ class Q():
         :returns: id of job
         """ 
         job = self.runCmd(["qsub"] + args)
-        id = job[0].split()
+        id = next(x for x in job)
+        id = id.split()[0]
         id = re.sub("\..*", "", id[0])
         return id
 

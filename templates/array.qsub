@@ -4,7 +4,12 @@
 #PBS -S /bin/bash
 #PBS -N jobber_batch
 #PBS -q longq
+<<<<<<< HEAD:templates/array.qsub
 #PBS -t 1-$array_size%$chunk_size
+=======
+#PBS -e /dev/null
+#PBS -o /dev/null
+>>>>>>> 9a3b6e333bc715c660f8722b0bdc1a6d42be7a7e:templates/job.qsub
 
 $wrapper $script 
 
